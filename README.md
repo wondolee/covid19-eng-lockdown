@@ -1,7 +1,7 @@
 ![ass_mob_eco](https://user-images.githubusercontent.com/61145109/99924646-752dd800-2d7e-11eb-8f00-a71b70349b29.png)
 
 ## Introduction
-This is a repository to provide R codes with public datasets necessary for the replication of the analysis results and figures on the paper entitle to "Trajectories of mobility reduction during England's first national COVID-19 lockdownThe association between socioeconomic status and mobility reductions in the early stage of England’s COVID-19 epidemic", prepared to the journal of [*Transportation Research Part C: Emerging Technologies*](https://www.journals.elsevier.com/transportation-research-part-c-emerging-technologies).
+This is a repository to provide R codes with public datasets necessary for the replication of the analysis results and figures on the paper entitle to "Trajectories of mobility reduction during England's first national COVID-19 lockdown", prepared to the journal of [*Transportation Research Part C: Emerging Technologies*](https://www.journals.elsevier.com/transportation-research-part-c-emerging-technologies).
 
 ## Authors
 * Won Do Lee ([Transport Studies Unit](https://www.tsu.ox.ac.uk/people/wdlee.html), School of Geography and the Environment, University of Oxford)
