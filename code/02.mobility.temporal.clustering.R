@@ -55,13 +55,15 @@ max.ts.clst.m.per.14<-join_all(list(comparison.per$pick,comparison.per.07$pick,
 require(dplyr)
 h04.per<-as.data.frame(cutree(best.per, k=4L))
 h04.per <- tibble::rownames_to_column(h04.per, "LTLA19CD")
+write.csv(h04.per,"h04.per.dtw.csv")
+
+h04.per<-readRDS(paste0(data.path,"mobility.temporal.cluster.rda"))
 colnames(h04.per)<- c("LTLA19CD","CLU")
 h04.per$CLU<-as.factor(h04.per$CLU)
 levels(h04.per$CLU)<-c("G4","G3","G1","G2")
 h04.per$CLU<-factor(h04.per$CLU,
                     levels=c("G1","G2","G3","G4"))
-write.csv(h04.per,"h04.per.dtw.csv")
-saveRDS(h04.per,"mobility.temporal.cluster.rda")
+#saveRDS(h04.per,"mobility.temporal.cluster.rda")
 
 require(sf)
 require(ggplot2)
@@ -84,7 +86,7 @@ la.coords$NAME <- eng.la.coord$RGN11NM
 
 ltla<-left_join(ltla,h04.per,by=c("LTLA19CD"))
 ltla<-na.omit(ltla)
-st_write(ltla,"ltla.h04.per.dtw.geojson")
+#st_write(ltla,"ltla.h04.per.dtw.geojson")
 
 cols<-c("G1"="#ca0020","G2"="#f4a582","G3"="#92c5de","G4"="#0571b0")
 
@@ -98,8 +100,7 @@ map.dtw.h04<-ggplot()+
                                   face = "bold"),
         legend.title=element_text(size =rel(5), family="notosanskr",
                                   face = "bold"), 
-        legend.text=element_text(size =rel(5), family="notosanskr",
-                                 face = "bold"),
+        legend.text=element_text(size =rel(5), family="notosanskr"),
         legend.position= "bottom")+
         annotation_scale(location = "br", height = unit(0.5, "cm")) +
         annotation_north_arrow(location = "tl", 
@@ -117,6 +118,10 @@ map.dtw.h04<-ggplot()+
                    segment.color = 'gray50')
 ggsave("map.dtw.h04.per.png", width=200, height=200, 
        units = "mm", dpi = 300, bg = "white")
+
+freq.clu.by.region<-plyr::count(ltla,c("REG_NM","CLU"))
+write.csv(freq.clu.by.region,"freq.clu.by.region.csv",row.names=FALSE,
+          fileEncoding="UTF-8")
 
 graph.data<-left_join(tbl.mob.per,h04.per,by="LTLA19CD")
 graph.data$Cluster<-as.factor(graph.data$CLU)
