@@ -124,7 +124,6 @@ write.csv(freq.clu.by.region,"freq.clu.by.region.csv",row.names=FALSE,
           fileEncoding="UTF-8")
 
 graph.data<-left_join(tbl.mob.per,h04.per,by="LTLA19CD")
-graph.data$Cluster<-as.factor(graph.data$CLU)
 #graph.data<-subset(graph.data,date>="2020-03-23" & date<"2020-05-11")
 
 plot.trend.Jul<- ggplot(data=graph.data,aes(x=date, y=ts(m.per.07),
@@ -157,11 +156,70 @@ plot.trend.Jul<- ggplot(data=graph.data,aes(x=date, y=ts(m.per.07),
 ggsave("plot.temp.trend.m.7.per.Jul.png", width=150, height=100, 
        scale=2,units = "mm", dpi = 300, bg = "white")
 
-require(gridExtra)
-plot.whole<-grid.arrange(plot.whole.med.per.jun,plot.trend.Jun,ncol=2)
-ggsave("both.per.png", width=300, height=200, units = "mm", dpi = 300, bg = "white",plot.whole)
+plot.trend.Jul<- ggplot(data=graph.data,aes(x=date, y=ts(m.per.07),
+                                            fill=CLU))+
+  theme_bw()+
+  theme(text=element_text(size=rel(6.5), family="notosanskr"),
+        plot.title = element_text(size =rel(5), family="notosanskr",
+                                  face = "bold"),
+        legend.title=element_text(size =rel(5), family="notosanskr",
+                                  face = "bold"), 
+        legend.text=element_text(size =rel(5), family="notosanskr",
+                                 face = "bold"),
+        strip.text.x = element_text(size =rel(10), family="notosanskr",
+                                    face = "bold"),
+        legend.position= "bottom")+
+  #geom_line(color="grey20",size=0.02,alpha=0.4)+
+  geom_boxplot(aes(x=date, y=m.per.07,group=date),
+               colour="gray50",alpha=.8,outlier.shape=0.1,linewidth=0.1)+
+  scale_fill_manual(values=cols,drop=FALSE)+
+  labs(x="Day",y="7-day rolling average of mobility reduction compared to the baseline (%)",
+       fill="Cluster", face="bold",size=rel(15), family="notosanskr",)+
+  scale_x_date(labels=date_format("%d %b"),breaks="2 months")+
+  scale_y_continuous(limits=c(-100, 25))+
+  geom_smooth(method ="loess",span=0.2,colour="black",linewidth=0.5,
+              se=TRUE)+
+  geom_vline(xintercept=graph.data$date[graph.data$date=="2020-03-03"],linetype=2, colour="black")+
+  geom_vline(xintercept=graph.data$date[graph.data$date=="2020-03-23"],linetype=2, colour="red")+
+  geom_vline(xintercept=graph.data$date[graph.data$date=="2020-05-11"],linetype=2, colour="red")+
+  facet_grid(~CLU)
+ggsave("plot.temp.trend.m.7.per.Jul.png", width=150, height=100, 
+       scale=2,units = "mm", dpi = 300, bg = "white")
 
-graph.data$week<-week(graph.data$date)
+plot.whole.med.per<-readRDS(paste0(data.path,"plot.whole.med.per.jun.rda"))
+plot.trend.Jul.line<- ggplot(data=graph.data,aes(x=date, y=ts(m.per.07),
+                                            colour=CLU))+
+  theme_bw()+
+  theme(text=element_text(size=rel(5), family="notosanskr"),
+        plot.title = element_text(size =rel(4), family="notosanskr",face = "bold"),
+        legend.title=element_text(size =rel(4), family="notosanskr",face = "bold"), 
+        legend.text=element_text(size =rel(2), family="notosanskr"),
+        strip.text.x = element_blank(),
+        strip.text.y = element_blank(),
+        axis.line.y=element_blank(),
+        legend.position= "bottom")+
+  #geom_line(color="grey20",size=0.02,alpha=0.4)+
+  #geom_boxplot(aes(x=date, y=m.per.07,group=date),
+               #colour="gray50",alpha=.8,outlier.shape=0.1,linewidth=0.1)+
+  scale_colour_manual(values=cols,drop=FALSE)+
+  labs(x=NULL,y=NULL,
+       colour="Cluster", face="bold",size=rel(15), family="notosanskr",)+
+  scale_x_date(labels=date_format("%d %b %Y"),breaks="2 months")+
+  scale_y_continuous(limits=c(-100, 0))+
+  geom_smooth(method ="loess",span=0.2,linewidth=4,
+              se=FALSE)+
+  geom_vline(xintercept=graph.data$date[graph.data$date=="2020-03-03"],linetype=2, colour="black")+
+  geom_vline(xintercept=graph.data$date[graph.data$date=="2020-03-23"],linetype=2, colour="red")+
+  geom_vline(xintercept=graph.data$date[graph.data$date=="2020-05-11"],linetype=2, colour="red")+
+  facet_grid(~CLU)
+
+
+require(gridExtra)
+plot.whole<-grid.arrange(plot.whole.med.per,plot.trend.Jul.line,ncol=2)
+ggsave("both.per.png", width=300, height=150, 
+       scale=4,units = "mm", dpi = 300, bg = "white",plot.whole)
+
+ graph.data$week<-week(graph.data$date)
 graph.data$day<-wday(graph.data$date)
 graph.data<-na.omit(graph.data)
 
