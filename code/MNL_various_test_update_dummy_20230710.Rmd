@@ -1,0 +1,315 @@
+[]---
+title: "Additional analysis and test"
+author: "Won Do Lee"
+date: "20 June 2021""
+---
+
+# Additionaly analysis for COVID-19 temporal paper
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = FALSE,
+	warning = FALSE
+)
+Sys.setlocale(locale="English_United Kingdom")
+setwd("d:/OneDrive - Nexus365/WORK/Document/RESEARCH/COVID19/09_IJGS SI/FINAL_CODE/")
+```
+
+## Visualising the latent temporal clusers by changes in mobility over 1st lockdown
+```{r import temporal clusters, echo=TRUE, message=FALSE, warning=FALSE, dpi=300, paged.print=TRUE}
+require(sf)
+require(rgdal)
+require(dplyr)
+ltla<-st_read("EN_LTLA_FOR_EP.shp")
+mob.cluster<-readRDS("mobility.temporal.cluster.rda")
+mob.cluster$CLU<-as.factor(mob.cluster$CLU)
+ltla<-left_join(ltla,mob.cluster,by="LTLA19CD")
+
+require(ggplot2)
+require(RColorBrewer)
+require(classInt)
+require(ggrepel)
+require(scales)
+require(rgdal)
+require(ggspatial)
+require(extrafont)
+loadfonts(device = "win")
+font_import(pattern = 'Raleway',prompt=FALSE)
+
+eng.la<-st_read("D:/WORKSPACE/COVID19/REVISE_LAST/ENGLAND_REGIONS.shp")
+eng.la.coord <- sf::st_point_on_surface(eng.la)
+la.coords <- as.data.frame(sf::st_coordinates(eng.la.coord))
+la.coords$NAME <- eng.la.coord$RGN11NM
+map.dtw.h04<-ggplot(ltla)+geom_sf(aes(fill=CLU))+labs(fill="Cluster")+
+  theme_bw()+
+  theme(legend.position = "bottom",plot.title = element_text(size =rel(3), face = "bold"),
+        legend.title=element_text(size=rel(1)), 
+        legend.text=element_text(size=rel(1)))+
+  annotation_scale(location = "br", height = unit(0.5, "cm")) +
+  annotation_north_arrow(location = "tl", 
+                         style = north_arrow_nautical, 
+                         height = unit(2, "cm"),
+                         width = unit(2, "cm"))+
+  geom_sf(data=eng.la,fill=NA,color="black",size=1,show.legend=FALSE)+
+  geom_label_repel(data=la.coords, aes(X, Y, label = NAME),
+                 colour = "Black",size=rel(4),family="Raleway",fontface="bold",
+                 box.padding = unit(1, "lines"),
+                 point.padding = unit(1, "lines"),
+                 segment.color = 'grey50')
+map.dtw.h04
+#ggsave("map.dtw.h04.per.png", map.dtw.h04,width=400, height=400, units = "mm", dpi = 300, bg = "white")
+```
+
+```{r change the order of latent temporal cluster, message=FALSE, warning=FALSE, include=FALSE, paged.print=TRUE}
+levels(ltla$CLU)
+#levels(ltla$CLU)<-c("2","1","3","4")
+#ltla$CLU <- ordered(ltla$CLU, levels = c("2", "1", "3","4"))
+```
+
+## Update the MNL model by different reference of latent temporal cluster
+```{r import independent variable and build the MNL model, message=FALSE, warning=FALSE, include=FALSE, paged.print=TRUE}
+indep.data<-readRDS(paste(getwd(),"/EP_INDEP_DATA/indep.var.rda",sep=""))
+```
+
+# For estimate of generalised linear models via penalised maximum likelihood for the regularisation parameter lambda (λ).
++ Logistic regression model was selected as the classification model, because the main goal of this research examines the relationship between changing mobility patterns and socio-demographical attributes with neighbourhood factors amid UK nationwide 1st lockdown.
++ Regularised regression allows to control the parameter estimates, and also  multicollinearity concerns with the feature selection characteristics of the LASSO penalty (i.e., factor reduction exercise). In other words, to reduce multicollinearity we can use regularisation that means to keep all the features but reducing the magnitude of the coefficients of the model.
++ Among the many available explanatory variables, some might be irrelevant in explaining the changing mobility patterns in a given location and the large number of predictors sometimes degrades the performance of classifiers. Therefore, feature selection is important when a training set consists of the large number of variables.
++ Algorithms for the LASSO for multinomial regression is suggested that accounts for the ease of feature selection, multinomial LASSO logistic regression, which adds L1 regularization to the log likelihood function.
+
+## Regularised multinomial regression; ridge, lasso, and elattic net regression
++ Setting λ (lambda) to 0 is the same as using the OLS, while the larger its value, the stronger is the coefficients' size penalized.
++ LASSO regression (α=1, the default) and ridge regression (α=0). 
++ The tuning parameter λ controls the overall strength of the penalty.
+
+## Multinomial LASSO logistic regression for the latent temporal clusters (k=4)
++ The grouped LASSO, where variables are inlcuded or exlcuded in groups.
++ A special option for multinomial regression is type.multinomial, which allows the usage of a grouped LASSO penalty if type.multinomial = "grouped". This will ensure that the multinomial coefficients for a variable are all in or out together.
+```{r MNL LASSO logistic regression model, echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
+require(glmnet)
+ltla<-ltla[order(ltla$LTLA19CD),]
+indep.data<-indep.data[order(indep.data$LTLA19CD),]
+std.indep.data<-as.data.frame(scale(indep.data[3:38]))
+std.indep.data[is.na(std.indep.data)]<-0
+
+##Scale the independent variable
+y=as.matrix(ltla$CLU)
+x=as.matrix(std.indep.data)
+
+lasso.fit<-glmnet(x,y,family = "multinomial", alpha=1, standardise=FALSE, nfolds=10) #trace.it = TRUE)
+plot(lasso.fit, xvar = "lambda", label = TRUE, type.coef = "2norm")
+#Graphical parameters showing the ℓ2-norm in one figur
+best_lambda_lasso<-min(lasso.fit$lambda)
+
+lasso.cvfit <- cv.glmnet(x, y, family = "multinomial", alpha=1, standardise=FALSE, type.multinomial = "ungrouped", type.measure="class",nfolds=10)
+plot(lasso.cvfit)
+coef(lasso.cvfit, s = "lambda.min")
+
+y_pred_coeff <- predict(lasso.cvfit, s="lambda.min", type="coefficients")
+y_multi_pred_class <- as.numeric(predict(lasso.fit, newx = x, type = "class",s=lasso.cvfit$lambda.min))
+xtabs(~ y_multi_pred_class + y)
+mean(y == y_multi_pred_class) #68.6% accurancy
+
+sqrt(lasso.cvfit$cvm[lasso.cvfit$lambda == lasso.cvfit$lambda.min])
+sqrt(lasso.cvfit$cvm[lasso.cvfit$lambda == lasso.cvfit$lambda.1se])
+
+##Get AIC and BIC value for MNL Lasso model
+glmnet_cv_aicc <- function(fit, lambda = 'lambda.min'){
+  whlm <- which(fit$lambda == fit[[lambda]])
+  with(fit$glmnet.fit,
+       {
+         tLL <- nulldev - nulldev * (1 - dev.ratio)[whlm]
+         k <- df[whlm]
+         n <- nobs
+         return(list('AICc' = - tLL + 2 * k + 2 * k * (k + 1) / (n - k - 1),
+                     'BIC' = log(n) * k - tLL))
+       })
+}
+
+print(glmnet_cv_aicc(lasso.cvfit))
+```
+
+## Classification using elastic net
++ To explore another shrinkage method to minimize the residual sum of squares plus some penalty term.
++ The best result uses α=0.1, 0.55, and 1 whilst λ is consistently 0.003628411.
+
+```{r ISLR pacakge, echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
+require(ISLR)
+require(caret)
+input.data<-cbind(indep.data[c(1:2)],std.indep.data)
+input.data<-left_join(input.data,mob.cluster,by="LTLA19CD")
+cv_5 = trainControl(method = "cv", number = 5)
+def_elnet=train(CLU~.,data=input.data[c(3:39)],method="glmnet",trControl=cv_5,trueLength=10)
+def_elnet
+
+get_best_result = function(caret_fit) {
+  best = which(rownames(caret_fit$results) == rownames(caret_fit$bestTune))
+  best_result = caret_fit$results[best, ]
+  rownames(best_result) = NULL
+  best_result
+}
+get_best_result(def_elnet) #alpha=1, accurancy = 56.8%
+```
+
+## Updating the LASSO MNL model with COVID-19 activity metrics; the effect of self-regulation behaviour on change in mobility before stay-at-home order.
+
++ To compute the COVID-19 growth rate ratio for a given LTLA on a given week, using a 7-day rolling average.
++ Approximately 50% decreased mobility level has been indiciated before the nationwide lockdown measure (similar to Badr et al. 2020)
+
++ Feedback loop between change in mobility and COVID-19 transmission - reduction of COVID-19 case growth corresponding with the reduction in mobility with n-day lag. (7-day from Rui et al. 2021)
+
+## Estimation of weekly-based COVID-19 growth rates amid lockdown and cumulative infection/mortality rates before lockdown in a given LTLA.
+```{r time-dependent net infection/mortality rates for updating the MNL Lasso model, echo=TRUE, message=FALSE, warning=FALSE, dpi=300, paged.print=TRUE}
+uk.ep.data<-readRDS("uk.ep.data.rda")
+en.ep.data<-subset(uk.ep.data,grepl("E0",LTLA19CD))
+en.ep.data<-en.ep.data[order(en.ep.data$date,en.ep.data$LTLA19CD),]
+
+ltla.pop<-read.csv("ltla.pop.per.ep.data.csv")
+ltla.pop<-ltla.pop[c(2,3,4)]
+
+en.ep.data<-left_join(en.ep.data,ltla.pop,by=c("LTLA19CD","LTLA19NM"))
+en.ep.data$daily.cases.per<-en.ep.data$daily.cases/(en.ep.data$LTLA.POP/100000)
+en.ep.data$daily.deaths.per<-en.ep.data$daily.deaths/(en.ep.data$LTLA.POP/100000)
+en.ep.data<-subset(en.ep.data,date>="2020-01-30" & date<"2020-07-07")
+en.ep.data[is.na(en.ep.data)]<-0
+
+require(lubridate)
+require(plyr)
+en.ep.data$wk<-week(en.ep.data$date)
+wk.en.ep.data<-ddply(en.ep.data,.(LTLA19CD,LTLA19NM,wk),summarise,weekly.avg.cases=mean(daily.cases,na.rm=TRUE),
+                     weekly.avg.deaths=mean(daily.deaths,na.rm=TRUE),
+                     weekly.avg.cases.per=mean(daily.cases.per,na.rm=TRUE),
+                     weekly.avg.deaths.per=mean(daily.deaths.per,na.rm=TRUE))
+
+#Cumulative infection rates from 30 January 2020 to 23 March 2020
+before.en.ep.data<-subset(en.ep.data,date>="2020-01-30" & date<"2020-03-23")
+before.en.ep.data<-ddply(before.en.ep.data,.(LTLA19CD,LTLA19NM),summarise,total.cases=sum(daily.cases), total.deaths=sum(daily.deaths))
+before.en.ep.data<-left_join(before.en.ep.data,ltla.pop,by=c("LTLA19CD","LTLA19NM"))
+before.en.ep.data$cum.infection.rates<-before.en.ep.data$total.cases/(before.en.ep.data$LTLA.POP/100000)
+before.en.ep.data$cum.mortality.rates<-before.en.ep.data$total.deaths/(before.en.ep.data$LTLA.POP/100000)
+
+input.eigen.before.en.ep.data<-left_join(ltla,before.en.ep.data,by=c("LTLA19CD","LTLA19NM"))
+
+cum.infection.rates.by.cluster<- ggplot(data=input.eigen.before.en.ep.data,aes(x=CLU, y=cum.infection.rates,fill=CLU))+  geom_boxplot(alpha=0.8) + labs(x="Latent temporal clusters by the changes in mobility ",y="Cumulative COVID-19 infection rates per 100k resident population before 1st lockdown",fill="Cluster",face="bold")
+cum.infection.rates.by.cluster
+#ggsave("cum.infection.rates.by.cluster.before.lockdown.png", cum.infection.rates.by.cluster,width=400, height=400, units = "mm", dpi = 300, bg = "white")
+
+cum.mortality.rates.by.cluster<- ggplot(data=input.eigen.before.en.ep.data,aes(x=CLU, y=cum.mortality.rates,fill=CLU))+  geom_boxplot(alpha=0.8)+labs(x="Latent temporal clusters by the changes in mobility ",y="Cumulative COVID-19 mortality rates per 100k resident population before 1st lockdown",fill="Cluster",face="bold")
+cum.mortality.rates.by.cluster
+#ggsave("cum.mortality.rates.by.cluster.before.lockdown.png", cum.mortality.rates.by.cluster,width=400, height=400, units = "mm", dpi = 300, bg = "white")
+```
+
++ How to deal with the COVID-19 infection/mortality growth during lockdown, and how it impact on the change in mobility.
+
+
+
+## Updating the multinomial LASSO logistic regression model with infection/morality rates
+```{r update the formula of MNL LASSO logistic model, echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
+indep.data<-indep.data[order(indep.data$LTLA19CD),]
+indep.data.update<-left_join(indep.data,input.eigen.before.en.ep.data[c(1:2,11:12)],by=c("LTLA19CD","LTLA19NM"))
+std.indep.data.update<-as.data.frame(as.data.frame(scale(indep.data.update[c(3:40)])))
+
+require(BBmisc)
+std.indep.data.update<-normalize(indep.data.update[c(3:40)],method="standardize",range=c(0,1),margin=1L,on.constant="quiet")
+std.indep.data.update[is.na(std.indep.data.update)]<-0
+
+##Scale the independent variable
+y=as.matrix(ltla$CLU)
+x.update=as.matrix(std.indep.data.update)
+
+lasso.fit.re<-glmnet(x.update,y,family = "multinomial", alpha=1, standardise=FALSE, type.multinomial = "ungrouped", nfolds=10) #trace.it = TRUE)
+plot(lasso.fit, xvar = "lambda", label = TRUE, type.coef = "2norm")
+#Graphical parameters showing the ℓ2-norm in one figur
+best_lambda_lasso<-min(lasso.fit$lambda)
+
+lasso.cvfit.re <- cv.glmnet(x.update, y, family = "multinomial", alpha=1, standardise=FALSE, type.multinomial = "ungrouped", type.measure="mse",nfolds=10)
+plot(lasso.cvfit.re)
+
+coef.g1<-data.frame(name = coef(lasso.cvfit.re, s = "lambda.min")$'G1'@Dimnames[[1]][coef(lasso.cvfit.re, s = "lambda.min")$'G1'@i + 1], coefficient = coef(lasso.cvfit.re, s = "lambda.min")$'G1'@x,group="G1") 
+
+coef.g2<-data.frame(name = coef(lasso.cvfit.re, s = "lambda.min")$'G2'@Dimnames[[1]][coef(lasso.cvfit.re, s = "lambda.min")$'G2'@i + 1], coefficient = coef(lasso.cvfit.re, s = "lambda.min")$'G2'@x,group="G2") 
+
+coef.g3<-data.frame(name = coef(lasso.cvfit.re, s = "lambda.min")$'G3'@Dimnames[[1]][coef(lasso.cvfit.re, s = "lambda.min")$'G3'@i + 1], coefficient = coef(lasso.cvfit.re, s = "lambda.min")$'G3'@x,group="G3") 
+
+coef.g4<-data.frame(name = coef(lasso.cvfit.re, s = "lambda.min")$'G4'@Dimnames[[1]][coef(lasso.cvfit.re, s = "lambda.min")$'G4'@i + 1], coefficient = coef(lasso.cvfit.re, s = "lambda.min")$'G4'@x,group="G4") 
+
+coef.all<-union_all(coef.g1,coef.g2);coef.all<-union_all(coef.all,coef.g3);coef.all<-union_all(coef.all,coef.g4)
+coef.all$name<-as.factor(coef.all$name)
+levels(coef.all$name)<-c("Constant","Cum. COVID-19 infection rates","Cum. COVID-19 moratlity rates", "%Bangladeshi","%Caribbean","%Other Black","%Low income HHs","%High income HHs","%Self-employed","%Social grade C1","HHs with 1 vehicle","HHs with more than 3 vehicles","%Other Asian","%Medium income HHs","%more than 3 bed rooms","Hospitals","%African","Residential population density")
+
+require(forcats)
+coef.all$name2<-fct_relevel(coef.all$name,"Constant","%Low income HHs","%Medium income HHs","%High income HHs","%Social grade C1", "%more than 3 bed rooms","Residential population density","HHs with 1 vehicle","HHs with more than 3 vehicles","Hospitals","%Self-employed","Cum. COVID-19 infection rates","Cum. COVID-19 moratlity rates","%Bangladeshi","%Other Asian","%African","%Caribbean","%Other Black")
+write.csv(coef.all,"lasso.estimated.coefficients.30Mar2023.csv")
+
+best_lambda_lasso<-min(lasso.cvfit.re$lambda.min)
+
+plot.std.coefficient<- ggplot(data = coef.all) +
+  geom_col(aes(x = coefficient, y = forcats::fct_rev(factor(name2)), fill = {coefficient > 0})) +
+  scale_fill_manual(values=c("blue", "red")) +
+  theme_bw()+
+  ggtitle(expression(paste("Estimated coefficients"))) +
+  xlab("Std.Coef.")+ylab("Predictors")+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position = "none") + facet_grid(~group)
+plot.std.coefficient
+ggsave("lasso.mnl.std.coefficient.re.30Mar2023.png",plot.std.coefficient,width=200, height=200, units = "mm", dpi = 300, bg = "white")
+
+caret::getModelInfo("glmnet")$glmnet$varImp
+varImp <- function(object, lambda = NULL, ...) {
+  ## skipping a few lines
+  beta <- predict(object, s = lambda, type = "coef")
+  if(is.list(beta)) {
+    out <- do.call("cbind", lapply(beta, function(x) x[,1]))
+    out <- as.data.frame(out, stringsAsFactors = TRUE)
+  } else out <- data.frame(Overall = beta[,1])
+  out <- abs(out[rownames(out) != "(Intercept)",,drop = FALSE])
+  out
+}
+
+rel.importance<-varImp(lasso.cvfit.re, lambda = lasso.cvfit.re$lambda.min,scale=TRUE)
+rel.importance$name<-dimnames(rel.importance)[[1]]
+colnames(rel.importance)<-c("G1","G2","G3","G4","Feature")
+rel.importance.trans<-melt(rel.importance,value.name="importance",value.var="Feature",variable.name="group")
+rel.importance.trans$Feature<-as.factor(rel.importance.trans$Feature)
+levels(rel.importance.trans$Feature)
+levels(rel.importance.trans$Feature)<-c("Cumulative COVID-19 infection rates","Cumulative COVID-19 mortality rates", "%African","%Bangladeshi","%Caribbean","%Chinese","%Indian","%Mixed","%Other ethnic group","%Other Asian","%Other Black","%Pakistani","%White","%Full-time worker", "%Bad heath" , "%Fair health", "%Good Health" , "Hospitals" , "%Low income HHs", "%High income HHs", "%Median income HHs", "Supermarkets","%No education","%Non-English speakers","Parks", "%Part-time worker","Residential population density", "%Self-employed", "%Social grade AB","%Social grade C1", "%Social Grade C2","%Social grade DE", "%Social rent", "%more than 3 beds","No vehicle in HHs", "1 vehicle in HHs","2 vehicles in HHs","more than 3 vehicles in HHs")
+
+rel.importance.trans<-subset(rel.importance.trans,importance>0)
+rel.importance.trans$Feature2<-fct_relevel(rel.importance.trans$Feature,"%Low income HHs","%Median income HHs","%High income HHs","%No education","%Non-English speakers", "%Social grade AB","%Social grade C1", "%Social Grade C2","%Social grade DE","%Social rent","%more than 3 beds","Residential population density","No vehicle in HHs", "1 vehicle in HHs","2 vehicles in HHs","more than 3 vehicles in HHs","Hospitals","Parks","Supermarkets", "%Part-time worker","%Full-time worker","%Self-employed", "%Good Health","%Fair health", "%Bad heath","Cumulative COVID-19 infection rates","Cumulative COVID-19 mortality rates","%White", "%Mixed","%Indian","%Pakistani","%Bangladeshi","%Chinese","%Other Asian","%African","%Caribbean","%Other Black","%Other ethnic group")
+
+plot.rank.features<- ggplot(data = rel.importance.trans) +
+  geom_col(aes(x = importance, y = forcats::fct_rev(factor(Feature2)), fill = {importance > 0})) +
+  #scale_fill_manual(values=c("blue", "red")) +
+  ggtitle(expression(paste("Ranking the features (0 to 1)"))) +
+  ylab("Feature importance")+
+  theme_bw()+
+  scale_fill_manual(values="gray40")+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position = "none") + facet_grid(~group)
+plot.rank.features
+ggsave("lasso.mnl.rank.features.no.scale.29Aug21.png",plot.rank.features,width=200, height=200, units = "mm", dpi = 300, bg = "white")
+write.csv(rel.importance,"rel.importance.feature.selection.no.scale.30Aug2021.csv")
+
+
+ggplot(data=input.eigen.before.en.ep.data,aes(x=CLU, y=cum.mortality.rates,fill=CLU))+  geom_boxplot(alpha=0.8)+labs(x="Latent temporal clusters by the changes in mobility ",y="Cumulative COVID-19 mortality rates per 100k resident population before 1st lockdown",fill="Cluster",face="bold")
+
+y_pred_coeff_update <- predict(lasso.cvfit.re, s="lambda.min", type="coefficients")
+y_multi_pred_class_update <- as.numeric(predict(lasso.fit.re, newx = x.update, type = "class",s=lasso.cvfit.re$lambda.min))
+xtabs(~ y_multi_pred_class_update + y)
+mean(y == y_multi_pred_class_update) #68.6% accurancy
+
+sqrt(lasso.cvfit.re$cvm[lasso.cvfit.re$lambda == lasso.cvfit.re$lambda.min])
+sqrt(lasso.cvfit.re$cvm[lasso.cvfit.re$lambda == lasso.cvfit.re$lambda.1se])
+
+##Get AIC and BIC value for MNL Lasso model
+print(glmnet_cv_aicc(lasso.cvfit.re))
+```
+
+Still updates...
+
+### Eigenvector spatial filtering (ESF) is introduced as a method for spatio-temporal mapping to uncover time-invariant COVID-19 cumulative infection/mortality rates before lockdown.
+```{r eigenvector, message=FALSE, warning=FALSE, paged.print=TRUE}
+require(spdep)
+require(spatialreg)
+
+```
