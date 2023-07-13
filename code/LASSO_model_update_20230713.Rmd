@@ -22,10 +22,14 @@ require(sf)
 require(rgdal)
 require(dplyr)
 ltla<-st_read(paste0(data.path,"EN_LTLA_FOR_EP.shp"))
+eng.la<-st_read(paste0(data.path,"ENGLAND_REGIONS.shp"))
+eng.la.coord <- sf::st_point_on_surface(eng.la)
+la.coords <- as.data.frame(sf::st_coordinates(eng.la.coord))
+la.coords$NAME <- eng.la.coord$RGN11NM
 mob.cluster<-readRDS(paste0(data.path,"mobility.temporal.cluster.rda"))
 mob.cluster$CLU<-as.factor(mob.cluster$CLU)
 ltla<-left_join(ltla,mob.cluster,by="LTLA19CD")
-levels(ltla$CLU)<-c("G3","G2","G1","G4")
+levels(ltla$CLU)<-c("G4","G3","G1","G2")
 ltla$CLU<-factor(ltla$CLU,levels=c("G1","G2","G3","G4"))
 
 require(ggplot2)
@@ -271,19 +275,18 @@ coef.g1<-data.frame(name = coef(lasso.cvfit.re, s = "lambda.min")$'G1'@Dimnames[
 coef.g2<-data.frame(name = coef(lasso.cvfit.re, s = "lambda.min")$'G2'@Dimnames[[1]][coef(lasso.cvfit.re, s = "lambda.min")$'G2'@i + 1], coefficient = coef(lasso.cvfit.re, s = "lambda.min")$'G2'@x,group="G2") 
 
 coef.g3<-data.frame(name = coef(lasso.cvfit.re, s = "lambda.min")$'G3'@Dimnames[[1]][coef(lasso.cvfit.re, s = "lambda.min")$'G3'@i + 1], coefficient = coef(lasso.cvfit.re, s = "lambda.min")$'G3'@x,group="G3") 
-s
+
 coef.g4<-data.frame(name = coef(lasso.cvfit.re, s = "lambda.min")$'G4'@Dimnames[[1]][coef(lasso.cvfit.re, s = "lambda.min")$'G4'@i + 1], coefficient = coef(lasso.cvfit.re, s = "lambda.min")$'G4'@x,group="G4") 
 
 coef.all<-union_all(coef.g1,coef.g2);coef.all<-union_all(coef.all,coef.g3);coef.all<-union_all(coef.all,coef.g4)
 coef.all$name<-factor(coef.all$name)
 levels(coef.all$name)<-c("Constant","North East","Yorkshire and the Humber","East Midlands","West Midlands",
-                         "East of England","London","South West","Cum. COVID-19 infection rates","Cum. COVID-19 moratlity rates", "%African","%Caribbean","%Other Asian","Hospitals","%High income HHs","%Median income HHs",
-                         "%Self-employed","%Social grade C1","%more than 3 bed rooms","HHs with 1 vehicle","HHs with more than 3 vehicles")
+                         "East of England","London","South West","Cum. COVID-19 infection rates","Cum. COVID-19 moratlity rates", "%African","%Bangladeshi","%Caribbean","%Other Asian","%Other Black","Hospitals","%Low income HHs","%High income HHs","%Median income HHs","Parks","Population den.","%Self-employed","%Social grade C1","%more than 3 bed rooms","HHs with 1 vehicle","HHs with more than 3 vehicles")
 
 require(forcats)
 coef.all$name2<-fct_relevel(coef.all$name,"Constant","North East","Yorkshire and the Humber","East Midlands","West Midlands",
-                         "East of England","London","South West","Cum. COVID-19 infection rates","Cum. COVID-19 moratlity rates", "%African","%Caribbean","%Other Asian","Hospitals","%High income HHs","%Median income HHs",
-                         "%Self-employed","%Social grade C1","%more than 3 bed rooms","HHs with 1 vehicle","HHs with more than 3 vehicles")
+                         "East of England","London","South West","Cum. COVID-19 infection rates","Cum. COVID-19 moratlity rates", "%African","%Bangladeshi","%Caribbean","%Other Asian","%Other Black","Hospitals","%Low income HHs","%High income HHs","%Median income HHs","Parks","Population den.","%Self-employed","%Social grade C1","%more than 3 bed rooms","HHs with 1 vehicle","HHs with more than 3 vehicles")
+
 write.csv(coef.all,"lasso.estimated.coefficients.13Jul2023.csv")
 
 best_lambda_lasso<-min(lasso.cvfit.re$lambda.min)
@@ -311,7 +314,8 @@ varImp <- function(object, lambda = NULL, ...) {
   out
 }
 
-rel.importance<-varImp(lasso.cvfit.re, lambda = best_lambda_lasso)
+rel.importance<-varImp(lasso.cvfit.re, lambda = best_lambda_lasso,
+                       scale=TRUE)
 rel.importance$name<-dimnames(rel.importance)[[1]]
 colnames(rel.importance)<-c("G1","G2","G3","G4","Feature")
 require(reshape2)
