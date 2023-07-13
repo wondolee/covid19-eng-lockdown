@@ -271,7 +271,7 @@ coef.g1<-data.frame(name = coef(lasso.cvfit.re, s = "lambda.min")$'G1'@Dimnames[
 coef.g2<-data.frame(name = coef(lasso.cvfit.re, s = "lambda.min")$'G2'@Dimnames[[1]][coef(lasso.cvfit.re, s = "lambda.min")$'G2'@i + 1], coefficient = coef(lasso.cvfit.re, s = "lambda.min")$'G2'@x,group="G2") 
 
 coef.g3<-data.frame(name = coef(lasso.cvfit.re, s = "lambda.min")$'G3'@Dimnames[[1]][coef(lasso.cvfit.re, s = "lambda.min")$'G3'@i + 1], coefficient = coef(lasso.cvfit.re, s = "lambda.min")$'G3'@x,group="G3") 
-
+s
 coef.g4<-data.frame(name = coef(lasso.cvfit.re, s = "lambda.min")$'G4'@Dimnames[[1]][coef(lasso.cvfit.re, s = "lambda.min")$'G4'@i + 1], coefficient = coef(lasso.cvfit.re, s = "lambda.min")$'G4'@x,group="G4") 
 
 coef.all<-union_all(coef.g1,coef.g2);coef.all<-union_all(coef.all,coef.g3);coef.all<-union_all(coef.all,coef.g4)
