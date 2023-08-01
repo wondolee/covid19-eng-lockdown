@@ -26,6 +26,7 @@ showtext_auto()
 
 tbl.l.mob<-tbl.g.mob[c("date","LTLA19CD","LTLA19NM","med.radius")]
 tbl.l.mob<-tbl.l.mob[order(tbl.l.mob$LTLA19CD,tbl.l.mob$date),]
+tbl.l.mob.median<-tbl.l.mob %>% dplyr::group_by(date) %>% dplyr::summarise(daily.med=median(med.radius)) %>% ungroup()
 
 plot.whole.med<- ggplot(data=tbl.l.mob.median,aes(x=date, y=ts(daily.med)))+
   #geom_line(color="grey20",size=0.02,alpha=0.4)+
