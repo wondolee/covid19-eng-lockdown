@@ -136,12 +136,12 @@ x.cat=as.matrix(std.indep.data.cat)
 x.bin=as.matrix(std.indep.data.bin)
 
 ##LASSO fit
-lasso.fit<-glmnet(x,y,family = "multinomial", alpha=1, standardise=FALSE, nfolds=10) #trace.it = TRUE)
+lasso.fit<-glmnet(x,y,family = "multinomial", alpha=1, standardise=TRUE, nfolds=10) #trace.it = TRUE)
 plot(lasso.fit, xvar = "lambda", label = TRUE, type.coef = "2norm")
 #Graphical parameters showing the ℓ2-norm in one figur
 best_lambda_lasso<-min(lasso.fit$lambda)
 
-lasso.cvfit <- cv.glmnet(x, y, family = "multinomial", alpha=1, standardise=FALSE, type.multinomial = "ungrouped", type.measure="class",nfolds=10)
+lasso.cvfit <- cv.glmnet(x, y, family = "multinomial", alpha=1, standardise=TRUE, type.multinomial = "ungrouped", type.measure="class",nfolds=10)
 plot(lasso.cvfit)
 coef(lasso.cvfit, s = "lambda.min")
 
@@ -262,12 +262,12 @@ x.update.cat=as.matrix(std.indep.data.cat)
 x.update.bin=as.matrix(std.indep.data.bin)
 
 ##Model fitting #1 ref
-lasso.fit.re<-glmnet(x.update.bin,y,family = "multinomial", alpha=1, standardise=FALSE, type.multinomial = "ungrouped", nfolds=10) #trace.it = TRUE)
-plot(lasso.fit, xvar = "lambda", label = TRUE, type.coef = "2norm")
+lasso.fit.re<-glmnet(x.update,y,family = "multinomial", alpha=1, standardize=TRUE, type.multinomial = "ungrouped", nfolds=10) #trace.it = TRUE)
+plot(lasso.fit.re, xvar = "lambda", label = TRUE, type.coef = "2norm")
 #Graphical parameters showing the ℓ2-norm in one figur
-best_lambda_lasso<-min(lasso.fit$lambda)
+best_lambda_lasso<-min(lasso.fit.re$lambda)
 
-lasso.cvfit.re <- cv.glmnet(x.update.bin, y, family = "multinomial", alpha=1, standardise=FALSE, type.multinomial = "ungrouped", type.measure="mse",nfolds=10)
+lasso.cvfit.re <- cv.glmnet(x.update, y, family = "multinomial", alpha=1, standardize =TRUE, type.multinomial = "ungrouped", type.measure="mse",nfolds=10)
 plot(lasso.cvfit.re)
 
 coef.g1<-data.frame(name = coef(lasso.cvfit.re, s = "lambda.min")$'G1'@Dimnames[[1]][coef(lasso.cvfit.re, s = "lambda.min")$'G1'@i + 1], coefficient = coef(lasso.cvfit.re, s = "lambda.min")$'G1'@x,group="G1") 
@@ -281,13 +281,18 @@ coef.g4<-data.frame(name = coef(lasso.cvfit.re, s = "lambda.min")$'G4'@Dimnames[
 coef.all<-union_all(coef.g1,coef.g2);coef.all<-union_all(coef.all,coef.g3);coef.all<-union_all(coef.all,coef.g4)
 coef.all$name<-factor(coef.all$name)
 levels(coef.all$name)<-c("Constant","North East","Yorkshire and the Humber","East Midlands","West Midlands",
-                         "East of England","London","South West","Cum. COVID-19 infection rates","Cum. COVID-19 moratlity rates", "%African","%Bangladeshi","%Caribbean","%Other Asian","%Other Black","Hospitals","%Low income HHs","%High income HHs","%Median income HHs","Parks","Population den.","%Self-employed","%Social grade C1","%more than 3 bed rooms","HHs with 1 vehicle","HHs with more than 3 vehicles")
+                         "East of England","London","South West","Cum. COVID-19 infection rates","Cum. COVID-19 moratlity rates", "%African","%Caribbean","%Other Asian","Hospitals","%High income HHs","%Median income HHs","%Self-employed","%Social grade C1","%more than 3 bed rooms","HHs with 1 vehicle","HHs with more than 3 vehicles")
 
 require(forcats)
 coef.all$name2<-fct_relevel(coef.all$name,"Constant","North East","Yorkshire and the Humber","East Midlands","West Midlands",
-                         "East of England","London","South West","Cum. COVID-19 infection rates","Cum. COVID-19 moratlity rates", "%African","%Bangladeshi","%Caribbean","%Other Asian","%Other Black","Hospitals","%Low income HHs","%High income HHs","%Median income HHs","Parks","Population den.","%Self-employed","%Social grade C1","%more than 3 bed rooms","HHs with 1 vehicle","HHs with more than 3 vehicles")
-
+                         "East of England","London","South West","%High income HHs","%Median income HHs","%Social grade C1","%more than 3 bed rooms","HHs with 1 vehicle","HHs with more than 3 vehicles","Hospitals","%Self-employed","Cum. COVID-19 infection rates","Cum. COVID-19 moratlity rates","%Other Asian","%African","%Caribbean")
+                            
+                        
 write.csv(coef.all,"lasso.estimated.coefficients.13Jul2023.csv")
+
+vip(lasso.fit.re, num_features=46 ,geom = "col", include_type=TRUE, lambda = "lambda.1se")
+
+
 
 best_lambda_lasso<-min(lasso.cvfit.re$lambda.min)
 
@@ -340,7 +345,7 @@ plot.rank.features
 ggsave("lasso.mnl.rank.features.no.scale.13Jul2023.png",plot.rank.features,width=200, height=200, units = "mm", dpi = 300, bg = "white")
 write.csv(rel.importance,"rel.importance.feature.selection.no.scale.13Jul2023.csv")
 
-rel.imp.re<-vip::vi_model(lasso.cvfit.re, s = lasso.cvfit.re$fit$lambda)
+rel.imp.re<-vip::vi_model(lasso.cvfit.re, s = lasso.cvfit.re$glmnet.fit$lambda)
 
 ggplot(data=input.eigen.before.en.ep.data,aes(x=CLU, y=cum.mortality.rates,fill=CLU))+  geom_boxplot(alpha=0.8)+labs(x="Latent temporal clusters by the changes in mobility ",y="Cumulative COVID-19 mortality rates per 100k resident population before 1st lockdown",fill="Cluster",face="bold")
 
