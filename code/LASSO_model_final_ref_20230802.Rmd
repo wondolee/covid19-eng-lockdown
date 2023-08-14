@@ -110,30 +110,9 @@ indep.data<-indep.data[order(indep.data$LTLA19CD),]
 std.indep.data<-as.data.frame(scale(indep.data[3:38]))
 std.indep.data[is.na(std.indep.data)]<-0
 
-##make dummy variable
-region.cat<-st_drop_geometry(ltla) %>% dplyr::select(LTLA19CD,REG_NM,CLU) %>% dplyr::ungroup()
-region.cat$REG_NM<-factor(region.cat$REG_NM)
-region.cat$bi.01[region.cat$REG_NM=="North East"]<-1
-region.cat$bi.02[region.cat$REG_NM=="North West"]<-1
-region.cat$bi.03[region.cat$REG_NM=="Yorkshire and The Humber"]<-1
-region.cat$bi.04[region.cat$REG_NM=="East Midlands"]<-1
-region.cat$bi.05[region.cat$REG_NM=="West Midlands"]<-1
-region.cat$bi.06[region.cat$REG_NM=="East of England"]<-1
-region.cat$bi.07[region.cat$REG_NM=="London"]<-1
-region.cat$bi.08[region.cat$REG_NM=="South East"]<-1
-region.cat$bi.09[region.cat$REG_NM=="South West"]<-1
-levels(region.cat$REG_NM)<-c("4","6","7","1","2","8","9","5","3")
-region.cat$cat<-as.numeric(region.cat$REG_NM)
-region.cat[is.na(region.cat)]<-0
-
 ##Scale the independent variable
 y=as.matrix(ltla$CLU)
-std.indep.data.cat<-cbind(std.indep.data,region.cat %>% select(cat()))
-std.indep.data.bin<-cbind(std.indep.data,region.cat %>% select(-LTLA19CD,-REG_NM,-CLU))
-
 x=as.matrix(std.indep.data)
-x.cat=as.matrix(std.indep.data.cat)
-x.bin=as.matrix(std.indep.data.bin)
 
 ##LASSO fit
 lasso.fit<-glmnet(x,y,family = "multinomial", alpha=1, standardise=TRUE, nfolds=10) #trace.it = TRUE)
@@ -146,7 +125,7 @@ plot(lasso.cvfit)
 coef(lasso.cvfit, s = "lambda.min")
 
 y_pred_coeff <- predict(lasso.cvfit, s="lambda.min", type="coefficients")
-y_multi_pred_class <- as.numeric(predict(lasso.fit, newx = x, type = "class",s=lasso.cvfit$lambda.min))
+y_multi_pred_class <- predict(lasso.fit, newx = x, type = "class",s=lasso.cvfit$lambda.min)
 xtabs(~ y_multi_pred_class + y)
 mean(y == y_multi_pred_class) #68.6% accurancy
 
@@ -251,15 +230,33 @@ require(BBmisc)
 std.indep.data.update<-normalize(indep.data.update[c(3:40)],method="standardize",range=c(0,1),margin=1L,on.constant="quiet")
 std.indep.data.update[is.na(std.indep.data.update)]<-0
 
-region.cat$cat<-factor(region.cat$cat)
-std.indep.data.cat<-cbind(std.indep.data.update,region.cat %>% select(cat))
-std.indep.data.bin<-cbind(std.indep.data.update,region.cat %>% select(-LTLA19CD,-REG_NM,-CLU,-cat))
-
 ##Scale the independent variable
 y=as.matrix(ltla$CLU)
 x.update=as.matrix(std.indep.data.update)
-x.update.cat=as.matrix(std.indep.data.cat)
-x.update.bin=as.matrix(std.indep.data.bin)
+
+
+##descriptive stat
+tbl.for.desc<-left_join(indep.data.update,st_drop_geometry(ltla),
+                        by=c("LTLA19CD","LTLA19NM"))
+desc.national.mean<-tbl.for.desc %>% dplyr::summarise_at(
+  vars(INC_20:cum.mortality.rates),mean,na.rm=TRUE) %>% ungroup()
+
+desc.national.sd<-tbl.for.desc %>% dplyr::summarise_at(
+  vars(INC_20:cum.mortality.rates),sd,na.rm=TRUE) %>% ungroup()
+
+desc.group.mean<-tbl.for.desc %>% dplyr::group_by(CLU) %>%
+  dplyr::summarise_at(vars(INC_20:cum.mortality.rates),mean,na.rm=TRUE) %>% 
+  ungroup()
+
+desc.group.sd<-tbl.for.desc %>% dplyr::group_by(CLU) %>%
+  dplyr::summarise_at(vars(INC_20:cum.mortality.rates),sd,na.rm=TRUE) %>% 
+  ungroup()
+
+write.csv(desc.national.mean,"desc.nat.mean.csv",row.names=FALSE)
+write.csv(desc.national.sd,"desc.nat.sd.csv",row.names=FALSE)
+write.csv(desc.group.mean,"desc.group.mean.csv",row.names=FALSE)
+write.csv(desc.group.sd,"desc.group.Sd.csv",row.names=FALSE)
+
 
 ##Model fitting #1 ref
 lasso.fit.re<-glmnet(x.update,y,family = "multinomial", alpha=1, standardize=TRUE, type.multinomial = "ungrouped", nfolds=10) #trace.it = TRUE)
@@ -280,17 +277,23 @@ coef.g4<-data.frame(name = coef(lasso.cvfit.re, s = "lambda.min")$'G4'@Dimnames[
 
 coef.all<-union_all(coef.g1,coef.g2);coef.all<-union_all(coef.all,coef.g3);coef.all<-union_all(coef.all,coef.g4)
 coef.all$name<-factor(coef.all$name)
-levels(coef.all$name)<-c("Constant","Cum. COVID-19 infection rates","Cum. COVID-19 moratlity rates", "%African","%Caribbean","%Other Asian","Hospitals","%High income HHs","%Median income HHs","%Self-employed","%Social grade C1","%more than 3 bed rooms","HHs with 1 vehicle","HHs with more than 3 vehicles")
+levels(coef.all$name)<-c("Constant","Cum. COVID-19 infection rates","Cum. COVID-19 moratlity rates", "%African","%Bangladeshi","%Caribbean","%Other Asian","%Other Black","Hospitals","%Low income HHs","%High income HHs","%Median income HHs","Res.density", "%Self-employed","%Social grade C1","%more than 3 bed rooms","HHs with 1 vehicle","HHs with more than 3 vehicles")
 
 require(forcats)
-coef.all$name2<-fct_relevel(coef.all$name,"Constant","North East","Yorkshire and the Humber","East Midlands","West Midlands",
-                         "East of England","London","South West","%High income HHs","%Median income HHs","%Social grade C1","%more than 3 bed rooms","HHs with 1 vehicle","HHs with more than 3 vehicles","Hospitals","%Self-employed","Cum. COVID-19 infection rates","Cum. COVID-19 moratlity rates","%Other Asian","%African","%Caribbean")
-                            
-                        
-write.csv(coef.all,"lasso.estimated.coefficients.13Jul2023.csv")
-
+coef.all$name2<-fct_relevel(coef.all$name,"Constant","%Low income HHs",
+                            "%Median income HHs","%High income HHs",
+                            "%Social grade C1",
+                            "%more than 3 bed rooms",
+                            "Res.density",
+                            "%Self-employed","%Bangladeshi","%Other Asian",
+                            "%African","%Caribbean","%Other Black",
+                            "HHs with 1 vehicle",
+                            "HHs with more than 3 vehicles",
+                            "Hospitals", 
+                            "Cum. COVID-19 infection rates",
+                            "Cum. COVID-19 moratlity rates")
+write.csv(coef.all,"lasso.estimated.coefficients.14Aug2023.csv")
 vip::vip(lasso.fit.re, num_features=46 ,geom = "col", include_type=TRUE, lambda = "lambda.1se")
-
 
 best_lambda_lasso<-min(lasso.cvfit.re$lambda.min)
 
@@ -307,7 +310,7 @@ plot.std.coefficient<- ggplot(data = coef.all) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1),
         legend.position = "none") + facet_grid(~group)
 plot.std.coefficient
-ggsave("lasso.mnl.std.coefficient.re.13Jul2023.png",plot.std.coefficient,width=200, height=200, units = "mm", dpi = 300, bg = "white")
+ggsave("lasso.mnl.std.coefficient.re.14Aug2023.png",plot.std.coefficient,width=200, height=200, units = "mm", dpi = 300, bg = "white")
 
 caret::getModelInfo("glmnet")$glmnet$varImp
 varImp <- function(object, lambda = NULL, ...) {
@@ -329,10 +332,28 @@ require(reshape2)
 rel.importance.trans<-melt(rel.importance,value.name="importance",value.var="Feature",variable.name="group")
 rel.importance.trans$Feature<-as.factor(rel.importance.trans$Feature)
 levels(rel.importance.trans$Feature)
-levels(rel.importance.trans$Feature)<-c("Cumulative COVID-19 infection rates","Cumulative COVID-19 mortality rates", "%African","%Bangladeshi","%Caribbean","%Chinese","%Indian","%Mixed","%Other ethnic group","%Other Asian","%Other Black","%Pakistani","%White","%Full-time worker", "%Bad heath" , "%Fair health", "%Good Health" , "Hospitals" , "%Low income HHs", "%High income HHs", "%Median income HHs", "Supermarkets","%No education","%Non-English speakers","Parks", "%Part-time worker","Residential population density", "%Self-employed", "%Social grade AB","%Social grade C1", "%Social Grade C2","%Social grade DE", "%Social rent", "%more than 3 beds","No vehicle in HHs", "1 vehicle in HHs","2 vehicles in HHs","more than 3 vehicles in HHs")
+levels(rel.importance.trans$Feature)<-c("Cumulative COVID-19 infection rates","Cumulative COVID-19 mortality rates", "%African","%Bangladeshi","%Caribbean","%Chinese","%Indian","%Mixed","%Other ethnic group","%Other Asian","%Other Black","%Pakistani","%White","%Full-time worker", "%Bad heath" , "%Fair health", "%Good Health" , "Hospitals" , "%Low income HHs", "%High income HHs", "%Median income HHs", "Supermarkets","%No education","%Non-English speakers","Parks", "%Part-time worker",   "Res.density","%Self-employed", "%Social grade AB","%Social grade C1", "%Social Grade C2","%Social grade DE", "%Social rent", "%more than 3 beds","No vehicle in HHs", "1 vehicle in HHs","2 vehicles in HHs","more than 3 vehicles in HHs")
   
 rel.importance.trans<-subset(rel.importance.trans,importance>0)
-rel.importance.trans$Feature2<-fct_relevel(rel.importance.trans$Feature,"%Low income HHs","%Median income HHs","%High income HHs","%No education","%Non-English speakers", "%Social grade AB","%Social grade C1", "%Social Grade C2","%Social grade DE","%Social rent","%more than 3 beds","Residential population density","No vehicle in HHs", "1 vehicle in HHs","2 vehicles in HHs","more than 3 vehicles in HHs","Hospitals","Parks","Supermarkets", "%Part-time worker","%Full-time worker","%Self-employed", "%Good Health","%Fair health", "%Bad heath","Cumulative COVID-19 infection rates","Cumulative COVID-19 mortality rates","%White", "%Mixed","%Indian","%Pakistani","%Bangladeshi","%Chinese","%Other Asian","%African","%Caribbean","%Other Black","%Other ethnic group")
+rel.importance.trans$Feature2<-fct_relevel(rel.importance.trans$Feature,
+                                           "%Low income HHs",
+                                           "%Median income HHs",
+                                           "%High income HHs",
+                                           "%Social grade C1",
+                                           "%more than 3 beds",
+                                           "Res.density",
+                                           "%Self-employed",
+                                           "%Bangladeshi",
+                                           "%Other Asian",
+                                           "%African",
+                                           "%Caribbean",
+                                           "%Other Black",
+                                           "1 vehicle in HHs",
+                                           "more than 3 vehicles in HHs",
+                                           "Hospitals",
+                                           "Cumulative COVID-19 infection rates",
+                                           "Cumulative COVID-19 mortality rates")
+       
 
 plot.rank.features<- ggplot(data = rel.importance.trans) +
   geom_col(aes(x = importance, y = forcats::fct_rev(factor(Feature2)), fill = {importance > 0})) +
@@ -344,17 +365,17 @@ plot.rank.features<- ggplot(data = rel.importance.trans) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1),
         legend.position = "none") + facet_grid(~group)
 plot.rank.features
-ggsave("lasso.mnl.rank.features.no.scale.13Jul2023.png",plot.rank.features,width=200, height=200, units = "mm", dpi = 300, bg = "white")
+ggsave("lasso.mnl.rank.features.no.scale.14Aug20233.png",plot.rank.features,width=200, height=200, units = "mm", dpi = 300, bg = "white")
 write.csv(rel.importance,"rel.importance.feature.selection.no.scale.13Jul2023.csv")
 
 rel.imp.re<-vip::vi_model(lasso.cvfit.re, s = lasso.cvfit.re$glmnet.fit$lambda)
 
 ggplot(data=input.eigen.before.en.ep.data,aes(x=CLU, y=cum.mortality.rates,fill=CLU))+  geom_boxplot(alpha=0.8)+labs(x="Latent temporal clusters by the changes in mobility ",y="Cumulative COVID-19 mortality rates per 100k resident population before 1st lockdown",fill="Cluster",face="bold")
 
-y_pred_coeff_update <- predict(lasso.cvfit.re, s="lambda.min", type="coefficients")
-y_multi_pred_class_update <- predict(lasso.fit.re, newx = x.update, type = "class",s=lasso.cvfit.re$lambda.min)
-xtabs(~ y_multi_pred_class_update + y)
-mean(y == y_multi_pred_class_update) #68.6% accurancy
+y_pred_coeff <- predict(lasso.cvfit, s="lambda.min", type="coefficients")
+y_multi_pred_class <- predict(lasso.fit, newx = x, type = "class",s=lasso.cvfit$lambda.min)
+xtabs(~ y_multi_pred_class + y)
+mean(y == y_multi_pred_class) #68.6% accurancy
 
 sqrt(lasso.cvfit.re$cvm[lasso.cvfit.re$lambda == lasso.cvfit.re$lambda.min])
 sqrt(lasso.cvfit.re$cvm[lasso.cvfit.re$lambda == lasso.cvfit.re$lambda.1se])
