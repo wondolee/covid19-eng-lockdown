@@ -335,7 +335,7 @@ levels(rel.importance.trans$Feature)
 levels(rel.importance.trans$Feature)<-c("Cumulative COVID-19 infection rates","Cumulative COVID-19 mortality rates", "%African","%Bangladeshi","%Caribbean","%Chinese","%Indian","%Mixed","%Other ethnic group","%Other Asian","%Other Black","%Pakistani","%White","%Full-time worker", "%Bad heath" , "%Fair health", "%Good Health" , "Hospitals" , "%Low income HHs", "%High income HHs", "%Median income HHs", "Supermarkets","%No education","%Non-English speakers","Parks", "%Part-time worker",   "Res.density","%Self-employed", "%Social grade AB","%Social grade C1", "%Social Grade C2","%Social grade DE", "%Social rent", "%more than 3 beds","No vehicle in HHs", "1 vehicle in HHs","2 vehicles in HHs","more than 3 vehicles in HHs")
   
 rel.importance.trans<-subset(rel.importance.trans,importance>0)
-rel.importance.trans$Feature2<-fct_relevel(rel.importance.trans$Feature,
+rel.importance.trans$Feature2<-fct_relevel(rel.importance.trans$Feature2,
                                            "%Low income HHs",
                                            "%Median income HHs",
                                            "%High income HHs",
@@ -353,7 +353,24 @@ rel.importance.trans$Feature2<-fct_relevel(rel.importance.trans$Feature,
                                            "Hospitals",
                                            "Cumulative COVID-19 infection rates",
                                            "Cumulative COVID-19 mortality rates")
-       
+rel.importance.trans$Feature2<-factor(rel.importance.trans$Feature2,
+                                      levels=c("%Low income HHs",
+                                           "%Median income HHs",
+                                           "%High income HHs",
+                                           "%Social grade C1",
+                                           "%more than 3 beds",
+                                           "Res.density",
+                                           "%Self-employed",
+                                           "%Bangladeshi",
+                                           "%Other Asian",
+                                           "%African",
+                                           "%Caribbean",
+                                           "%Other Black",
+                                           "1 vehicle in HHs",
+                                           "more than 3 vehicles in HHs",
+                                           "Hospitals",
+                                           "Cumulative COVID-19 infection rates",
+                                           "Cumulative COVID-19 mortality rates"))     
 
 plot.rank.features<- ggplot(data = rel.importance.trans) +
   geom_col(aes(x = importance, y = forcats::fct_rev(factor(Feature2)), fill = {importance > 0})) +
